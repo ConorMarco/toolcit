@@ -21,15 +21,50 @@ _addpath_is_sourced() {
     fi
 }
 
+_ADDPATH_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/addpath/paths"
+
+# When executed as a script (not sourced), write to the store and exit.
+# PATH modification is skipped since scripts can't affect the parent shell.
 if ! _addpath_is_sourced; then
-    echo "addpath: must be sourced, not executed" >&2
-    echo "Add to your .zshrc or .bashrc:" >&2
-    echo "  source ${BASH_SOURCE[0]:-$0}" >&2
-    exit 1
+    unset -f _addpath_is_sourced
+    _addpath_script_main() {
+        local prepend=0 dir marker
+        local -a dirs=()
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                -p|--prepend) prepend=1; shift ;;
+                --) shift; dirs+=("$@"); break ;;
+                -h|--help)
+                    echo "Usage: addpath [-p|--prepend] <dir> [dir...]"
+                    echo "  -p, --prepend   prepend to PATH instead of appending"
+                    echo "Note: source this file in your shell rc to also modify PATH immediately."
+                    exit 0
+                    ;;
+                -*) echo "addpath: unknown option: $1" >&2; exit 1 ;;
+                *) dirs+=("$1"); shift ;;
+            esac
+        done
+        if [[ ${#dirs[@]} -eq 0 ]]; then
+            echo "Usage: addpath [-p|--prepend] <dir> [dir...]" >&2
+            exit 1
+        fi
+        mkdir -p "${_ADDPATH_FILE%/*}"
+        for dir in "${dirs[@]}"; do
+            dir="${dir%/}"
+            if grep -qxF "a:$dir" "$_ADDPATH_FILE" 2>/dev/null || \
+               grep -qxF "p:$dir" "$_ADDPATH_FILE" 2>/dev/null; then
+                echo "addpath: already stored: $dir" >&2
+                continue
+            fi
+            if [[ $prepend -eq 1 ]]; then marker=p; else marker=a; fi
+            echo "$marker:$dir" >> "$_ADDPATH_FILE"
+            echo "addpath: added $dir"
+        done
+    }
+    _addpath_script_main "$@"
+    exit $?
 fi
 unset -f _addpath_is_sourced
-
-_ADDPATH_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/addpath/paths"
 
 # Load all stored paths into the current shell's PATH
 _addpath_load() {
