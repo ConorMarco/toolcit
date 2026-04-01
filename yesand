@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# If no arguments are provided, default to "y" to mimic standard 'yes'
+if [ $# -eq 0 ]; then
+    set -- "y"
+fi
+
+# Infinite loop
+while :; do
+    for arg in "$@"; do
+        printf "%s\n" "$arg"
+    done
+done
