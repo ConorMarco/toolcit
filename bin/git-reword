@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# git-reword - amend the last commit message
+#
+# Usage: git reword [<message>]
+# Without a message, opens the commit in your configured git editor.
+
+if [[ $# -eq 0 ]]; then
+    exec git commit --amend --only
+else
+    exec git commit --amend --only -m "$*"
+fi

@@ -36,6 +36,17 @@ done
 # Register bin/ at the front of the persistent PATH store
 "$ADDPATH" --prepend "$BIN_DIR"
 
+# Configure git init template (provides .gitignore for new and cloned repos)
+if ! git config --global init.templateDir &>/dev/null; then
+    read -r -p "Set git init template to add a default .gitignore to new/cloned repos? [y/N] " reply
+    if [[ "$reply" =~ ^[Yy]$ ]]; then
+        git config --global init.templateDir "$REPO_DIR/etc/git-template"
+        echo "install: set git init template to $REPO_DIR/etc/git-template"
+    fi
+else
+    echo "install: skipped init.templateDir (already set to $(git config --global init.templateDir))"
+fi
+
 if [ ${#added_to[@]} -gt 0 ]; then
     echo "install: added source line to:"
     printf '  %s\n' "${added_to[@]}"

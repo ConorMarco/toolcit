@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# git-del - delete a branch locally and on the remote
+#
+# Usage: git del [<branch>]
+# Defaults to the current branch (with confirmation prompt).
+
+set -euo pipefail
+
+if [[ $# -gt 1 ]]; then
+    echo "Usage: git del [<branch>]" >&2
+    exit 1
+fi
+
+if [[ $# -eq 1 ]]; then
+    branch="$1"
+else
+    branch="$(git symbolic-ref --short HEAD)"
+    read -r -p "Delete current branch '$branch'? [y/N] " reply
+    [[ "$reply" =~ ^[Yy]$ ]] || exit 0
+fi
+
+git branch -D "$branch"
+git push origin --delete "$branch"

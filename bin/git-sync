@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# git-sync - sync all branches between local and remote
+#
+# Usage: git sync [<remote>]
+# Defaults to 'origin'.
+#
+# - Fetches all remote branches (pruning deleted ones)
+# - Creates local tracking branches for any new remote branches
+# - Fast-forwards local branches that are behind their remote counterpart
+# - Pushes all local branches (including new ones) to remote
+# - Warns about diverged branches and skips them
+
+set -euo pipefail
+
+remote="${1:-origin}"
+current="$(git symbolic-ref --short HEAD)"
+
+echo "sync: fetching from $remote..."
+git fetch --all --prune
+
+# Create local tracking branches for new remote branches
+while IFS= read -r ref; do
+    branch="${ref#refs/remotes/$remote/}"
+    [[ "$branch" == "HEAD" ]] && continue
+    if ! git show-ref --verify --quiet "refs/heads/$branch"; then
+        git branch --track "$branch" "$ref"
+        echo "sync: created '$branch' tracking '$remote/$branch'"
+    fi
+done < <(git for-each-ref --format='%(refname)' "refs/remotes/$remote/")
+
+# Fast-forward local branches that are behind their remote counterpart
+while IFS= read -r branch; do
+    remote_ref="refs/remotes/$remote/$branch"
+    git show-ref --verify --quiet "$remote_ref" || continue
+
+    local_sha="$(git rev-parse "refs/heads/$branch")"
+    remote_sha="$(git rev-parse "$remote_ref")"
+    [[ "$local_sha" == "$remote_sha" ]] && continue
+
+    if git merge-base --is-ancestor "$local_sha" "$remote_sha"; then
+        if [[ "$branch" == "$current" ]]; then
+            git merge --ff-only "$remote_ref"
+        else
+            git update-ref "refs/heads/$branch" "$remote_sha"
+        fi
+        echo "sync: fast-forwarded '$branch'"
+    elif git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+        : # local is ahead; will be pushed below
+    else
+        echo "sync: warning: '$branch' has diverged from '$remote/$branch', skipping" >&2
+    fi
+done < <(git for-each-ref --format='%(refname:short)' refs/heads/)
+
+echo "sync: pushing all branches to $remote..."
+git push --all "$remote"
+
+echo "sync: done"

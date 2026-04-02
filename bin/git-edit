@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# git-edit - amend the last commit
+#
+# Usage: git edit [<message>]
+# Without a message, keeps the existing commit message.
+
+if [[ $# -eq 0 ]]; then
+    exec git commit --amend --no-edit
+else
+    exec git commit --amend -m "$*"
+fi
