@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+# hsi - interactive history search TUI
+#
+# Outputs the selected command to stdout.
+# For shell readline integration, use the hsi shell function defined
+# when shell-init is sourced.
+
+import os
+import re
+import select
+import sys
+import termios
+import tty
+
+DEFAULT_RESULT_LINES = 8
+
+
+def get_history():
+    candidates = []
+    histfile = os.environ.get('HISTFILE', '')
+    if histfile:
+        candidates.append(histfile)
+    candidates += [os.path.expanduser('~/.zsh_history'),
+                   os.path.expanduser('~/.bash_history')]
+    for path in candidates:
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                content = f.read().decode('utf-8', errors='replace')
+            lines = []
+            for line in content.splitlines():
+                line = re.sub(r'^: \d+:\d+;', '', line)
+                if line.strip():
+                    lines.append(line)
+            return lines
+    return []
+
+
+def filter_history(history, query, case_sensitive=False):
+    if not query.strip():
+        return history
+    terms = query.split()
+    if case_sensitive:
+        return [line for line in history if all(t in line for t in terms)]
+    else:
+        terms_lower = [t.lower() for t in terms]
+        return [line for line in history if all(t in line.lower() for t in terms_lower)]
+
+
+def read_key(fd):
+    ch = os.read(fd, 1)
+    if ch == b'\x1b':
+        r, _, _ = select.select([fd], [], [], 0.05)
+        if r:
+            ch2 = os.read(fd, 1)
+            if ch2 == b'[':
+                r, _, _ = select.select([fd], [], [], 0.05)
+                if r:
+                    ch3 = os.read(fd, 1)
+                    if ch3 == b'A': return 'UP'
+                    if ch3 == b'B': return 'DOWN'
+                    if ch3 == b'C': return 'RIGHT'
+                    if ch3 == b'D': return 'LEFT'
+        return 'ESC'
+    if ch in (b'\r', b'\n'): return 'ENTER'
+    if ch in (b'\x7f', b'\x08'): return 'BACKSPACE'
+    if ch == b'\x03': return 'CTRL_C'
+    if ch == b'\x15': return 'CTRL_U'
+    return ch.decode('utf-8', errors='replace')
+
+
+def terminal_size():
+    import shutil
+    s = shutil.get_terminal_size()
+    return s.lines, s.columns
+
+
+def truncate(s, width):
+    return s[:width - 1] + '…' if len(s) >= width else s
+
+
+def draw(query, cursor_pos, results, selected_idx, n_result_lines, cols):
+    sys.stderr.write(f'\x1b[{n_result_lines}A\r\x1b[0J')
+
+    if results:
+        # Keep selected visible, show oldest→newest top→bottom
+        start = max(0, selected_idx - n_result_lines + 1)
+        start = min(start, max(0, len(results) - n_result_lines))
+        display = results[start:start + n_result_lines]
+
+        for _ in range(n_result_lines - len(display)):
+            sys.stderr.write('\r\n')
+
+        for i, line in enumerate(display):
+            if start + i == selected_idx:
+                sys.stderr.write('\x1b[7m')
+            sys.stderr.write(truncate(line, cols))
+            sys.stderr.write('\x1b[0m\r\n')
+    else:
+        for _ in range(n_result_lines - 1):
+            sys.stderr.write('\r\n')
+        sys.stderr.write('  (no matches)\r\n')
+
+    prompt = f'> {query}'
+    sys.stderr.write(truncate(prompt, cols))
+
+    # Move terminal cursor to match cursor_pos within query
+    chars_after_cursor = len(query) - cursor_pos
+    if chars_after_cursor > 0:
+        sys.stderr.write(f'\x1b[{chars_after_cursor}D')
+
+    sys.stderr.flush()
+
+
+def parse_args():
+    import argparse
+    p = argparse.ArgumentParser(prog='hsi', add_help=False)
+    p.add_argument('-n', type=int, default=DEFAULT_RESULT_LINES)
+    p.add_argument('-c', dest='case_sensitive', action='store_true', default=False)
+    p.add_argument('-C', dest='case_sensitive', action='store_false')
+    p.add_argument('-h', '--help', action='store_true')
+    args = p.parse_args()
+    if args.help:
+        print('Usage: hsi [-n <lines>] [-c|-C]')
+        sys.exit(0)
+    return args
+
+
+def main():
+    args = parse_args()
+    history = get_history()
+    query = ''
+    cursor_pos = 0
+    case_sensitive = args.case_sensitive
+    results = list(history)
+    selected_idx = len(results) - 1 if results else 0
+
+    rows, cols = terminal_size()
+    n_result_lines = min(args.n, rows - 3)
+
+    sys.stderr.write('\n' * n_result_lines)
+
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    selected = None
+
+    try:
+        tty.setraw(fd)
+        draw(query, cursor_pos, results, selected_idx, n_result_lines, cols)
+
+        while True:
+            key = read_key(fd)
+
+            if key in ('ESC', 'CTRL_C'):
+                break
+            elif key == 'ENTER':
+                if results:
+                    selected = results[selected_idx]
+                break
+            elif key == 'BACKSPACE':
+                if cursor_pos > 0:
+                    query = query[:cursor_pos - 1] + query[cursor_pos:]
+                    cursor_pos -= 1
+                    results = filter_history(history, query, case_sensitive)
+                    selected_idx = len(results) - 1 if results else 0
+            elif key == 'CTRL_U':
+                query = ''
+                cursor_pos = 0
+                results = filter_history(history, query, case_sensitive)
+                selected_idx = len(results) - 1 if results else 0
+            elif key == 'LEFT':
+                cursor_pos = max(0, cursor_pos - 1)
+            elif key == 'RIGHT':
+                cursor_pos = min(len(query), cursor_pos + 1)
+            elif key == 'UP':
+                if results and selected_idx > 0:
+                    selected_idx -= 1
+            elif key == 'DOWN':
+                if results and selected_idx < len(results) - 1:
+                    selected_idx += 1
+            elif len(key) == 1 and key.isprintable():
+                query = query[:cursor_pos] + key + query[cursor_pos:]
+                cursor_pos += 1
+                results = filter_history(history, query, case_sensitive)
+                selected_idx = len(results) - 1 if results else 0
+
+            rows, cols = terminal_size()
+            n_result_lines = min(args.n, rows - 3)
+            draw(query, cursor_pos, results, selected_idx, n_result_lines, cols)
+
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        rows, cols = terminal_size()
+        n_result_lines = min(args.n, rows - 3)
+        sys.stderr.write(f'\x1b[{n_result_lines}A\r\x1b[0J')
+        sys.stderr.flush()
+
+    if selected:
+        print(selected)
+
+
+if __name__ == '__main__':
+    main()

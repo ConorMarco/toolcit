@@ -8,8 +8,8 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$REPO_DIR/bin"
-ADDPATH="$BIN_DIR/addpath"
-SOURCE_LINE="source \"$ADDPATH\""
+SHELL_INIT="$REPO_DIR/shell-init"
+SOURCE_LINE="source \"$SHELL_INIT\""
 
 RC_FILES=(
     "$HOME/.zshrc"
@@ -25,7 +25,7 @@ skipped=()
 for rc in "${RC_FILES[@]}"; do
     [ -f "$rc" ] || continue
     # Match any reasonable quoting style for the path
-    if grep -qF "$ADDPATH" "$rc" 2>/dev/null; then
+    if grep -qF "$SHELL_INIT" "$rc" 2>/dev/null; then
         skipped+=("$rc")
         continue
     fi
@@ -34,7 +34,7 @@ for rc in "${RC_FILES[@]}"; do
 done
 
 # Register bin/ at the front of the persistent PATH store
-"$ADDPATH" --prepend "$BIN_DIR"
+"$BIN_DIR/addpath" --prepend "$BIN_DIR" 2>/dev/null
 
 # Configure git init template (provides .gitignore for new and cloned repos)
 if ! git config --global init.templateDir &>/dev/null; then
@@ -58,4 +58,4 @@ fi
 
 echo ""
 echo "install: done. Open a new shell or run:"
-echo "  source $ADDPATH"
+echo "  source $SHELL_INIT"

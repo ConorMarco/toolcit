@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# hs - search shell history
+#
+# Usage: hs [-n <count>] [-i] [-c|-C] <term> [term...]
+# Returns the most recent matching commands. Default count: 10.
+# Use -i for interactive mode (or just run hsi directly).
+# Default search is case insensitive; use -c for case sensitive.
+
+set -euo pipefail
+
+count=10
+terms=()
+hsi_args=()
+grep_flags=(-Fi)
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n)
+            [[ $# -ge 2 ]] || { echo "hs: -n requires an argument" >&2; exit 1; }
+            count="$2"
+            hsi_args+=(-n "$2")
+            shift 2
+            ;;
+        -i|--interactive)
+            shift
+            exec hsi "${hsi_args[@]}" "$@"
+            ;;
+        -c)
+            grep_flags=(-F)
+            hsi_args+=(-c)
+            shift
+            ;;
+        -C)
+            grep_flags=(-Fi)
+            hsi_args+=(-C)
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: hs [-n <count>] [-i] [-c|-C] <term> [term...]"
+            exit 0
+            ;;
+        -*) echo "hs: unknown option: $1" >&2; exit 1 ;;
+        *) terms+=("$1"); shift ;;
+    esac
+done
+
+if [[ ${#terms[@]} -eq 0 ]]; then
+    echo "Usage: hs [-n <count>] [-i] [-c|-C] <term> [term...]" >&2
+    exit 1
+fi
+
+# Find history file
+if [[ -n "${HISTFILE:-}" && -f "$HISTFILE" ]]; then
+    histfile="$HISTFILE"
+elif [[ -f "$HOME/.zsh_history" ]]; then
+    histfile="$HOME/.zsh_history"
+elif [[ -f "$HOME/.bash_history" ]]; then
+    histfile="$HOME/.bash_history"
+else
+    echo "hs: no history file found" >&2
+    exit 1
+fi
+
+# Strip zsh extended history format (: timestamp:elapsed;command)
+results="$(sed 's/^: [0-9]*:[0-9]*;//' "$histfile")"
+
+# Filter by all terms
+for term in "${terms[@]}"; do
+    results="$(grep "${grep_flags[@]}" -- "$term" <<< "$results" || true)"
+    [[ -n "$results" ]] || { echo "hs: no matches"; exit 0; }
+done
+
+tail -n "$count" <<< "$results"

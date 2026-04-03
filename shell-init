@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# shell-init - toolcit shell integrations
+#
+# SOURCE this file in your .zshrc / .bashrc / etc. (install.sh does this):
+#   source /path/to/shell-init
+
+# Load addpath (PATH management + function)
+source "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")/bin/addpath"
+
+# hsi: wraps the hsi binary to insert the selected command into the readline
+# buffer rather than printing it to stdout.
+if command -v hsi &>/dev/null 2>&1; then
+    _hsi() {
+        local cmd
+        cmd="$(command hsi "$@")"
+        [[ -z "$cmd" ]] && return
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            print -z "$cmd"
+        elif [[ -n "${BASH_VERSION:-}" ]]; then
+            READLINE_LINE="$cmd"
+            READLINE_POINT=${#cmd}
+        fi
+    }
+    alias hsi=_hsi
+fi
