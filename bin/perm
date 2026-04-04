@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# perm - permanently add a line to shell rc files
+#
+# Usage: perm [-f] <line>
+#   -f    treat the argument as a file path; adds a source line instead
+#
+# For each shell, adds to the first rc file that exists:
+#   zsh:  ~/.zshrc, ~/.zsh_profile, ~/.zshenv
+#   bash: ~/.bashrc, ~/.bash_profile, ~/.profile
+#   ksh:  ~/.kshrc
+
+set -euo pipefail
+
+source_mode=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -f|--file) source_mode=1; shift ;;
+        -h|--help)
+            echo "Usage: perm [-f] <line>"
+            echo "  -f  treat argument as a file path and add a source line"
+            exit 0
+            ;;
+        -*) echo "perm: unknown option: $1" >&2; exit 1 ;;
+        *) break ;;
+    esac
+done
+
+if [[ $# -eq 0 ]]; then
+    echo "Usage: perm [-f] <line>" >&2
+    exit 1
+fi
+
+if [[ $source_mode -eq 1 ]]; then
+    line="source \"$(realpath "$1")\""
+else
+    line="$*"
+fi
+
+# Each entry is a colon-separated list of candidates; the first existing file wins
+shell_groups=(
+    "$HOME/.zshrc:$HOME/.zsh_profile:$HOME/.zshenv"
+    "$HOME/.bashrc:$HOME/.bash_profile:$HOME/.profile"
+    "$HOME/.kshrc"
+)
+
+for group in "${shell_groups[@]}"; do
+    IFS=':' read -ra candidates <<< "$group"
+    for rc in "${candidates[@]}"; do
+        [[ -f "$rc" ]] || continue
+        if grep -qF "$line" "$rc" 2>/dev/null; then
+            echo "perm: already in $rc"
+        else
+            echo "$line" >> "$rc"
+            echo "perm: added to $rc"
+        fi
+        break
+    done
+done
