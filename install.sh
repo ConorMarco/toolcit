@@ -36,15 +36,21 @@ done
 # Register bin/ at the front of the persistent PATH store
 "$BIN_DIR/addpath" --prepend "$BIN_DIR" 2>/dev/null
 
-# Configure git init template (provides .gitignore for new and cloned repos)
-if ! git config --global init.templateDir &>/dev/null; then
-    read -r -p "Set git init template to add a default .gitignore to new/cloned repos? [y/N] " reply
-    if [[ "$reply" =~ ^[Yy]$ ]]; then
-        git config --global init.templateDir "$REPO_DIR/etc/git-template"
-        echo "install: set git init template to $REPO_DIR/etc/git-template"
-    fi
+# Offer git-clone wrapper (copies init.templateDir .gitignore into cloned repos)
+echo ""
+echo "toolcit includes a 'git clone' wrapper that copies your init.templateDir .gitignore"
+echo "into cloned repos that don't already have one."
+echo "Requires init.templateDir to be configured, e.g.:"
+echo "  git config --global init.templateDir ~/.config/git/template"
+echo "  mkdir -p ~/.config/git/template && cp /path/to/.gitignore ~/.config/git/template/"
+read -r -p "Enable the git clone wrapper? [y/N] " reply
+if [[ "$reply" =~ ^[Yy]$ ]]; then
+    git config --global toolcit.wrapClone true
+    echo "install: enabled git clone wrapper. To disable later:"
+    echo "  git config --global toolcit.wrapClone false"
 else
-    echo "install: skipped init.templateDir (already set to $(git config --global init.templateDir))"
+    echo "install: skipped. To enable later:"
+    echo "  git config --global toolcit.wrapClone true"
 fi
 
 if [ ${#added_to[@]} -gt 0 ]; then

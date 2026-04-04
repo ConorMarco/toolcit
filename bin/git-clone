@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# git-clone - wrapper around git clone that copies the default .gitignore
+# template into the cloned repo if one is configured and the repo doesn't
+# already have one.
+#
+# Enable with:
+#   git config --global toolcit.wrapClone true
+
+set -euo pipefail
+
+# Remove our bin from PATH to call the real git clone without recursing
+_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATH="${PATH//${_bin}:/}" git clone "$@"
+
+# Only proceed if feature is enabled and a template .gitignore is configured
+[[ "$(git config --global toolcit.wrapClone 2>/dev/null)" == "true" ]] || exit 0
+template_dir="$(git config --global init.templateDir 2>/dev/null)" || exit 0
+template_ignore="$template_dir/.gitignore"
+[[ -f "$template_ignore" ]] || exit 0
+
+# Find the target directory by scanning positional args
+positional=()
+skip_next=0
+for arg in "$@"; do
+    if [[ $skip_next -eq 1 ]]; then
+        skip_next=0
+        continue
+    fi
+    case "$arg" in
+        -o|--origin|-b|--branch|-u|--upload-pack|--reference|--reference-if-able|\
+        --separate-git-dir|--depth|--shallow-since|--shallow-exclude|\
+        --jobs|-j|--filter|--template|--config|-c)
+            skip_next=1 ;;
+        --*=*) ;;
+        -*) ;;
+        *) positional+=("$arg") ;;
+    esac
+done
+
+if [[ ${#positional[@]} -ge 2 ]]; then
+    clone_dir="${positional[-1]}"
+elif [[ ${#positional[@]} -eq 1 ]]; then
+    clone_dir="$(basename "${positional[0]%/}" .git)"
+else
+    exit 0
+fi
+
+[[ -d "$clone_dir" ]] || exit 0
+[[ ! -f "$clone_dir/.gitignore" ]] || exit 0
+
+cp "$template_ignore" "$clone_dir/.gitignore"
+echo "git-clone: copied default .gitignore into $clone_dir"
