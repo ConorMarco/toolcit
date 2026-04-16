@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # git-edit - amend the last commit
 #
-# Usage: git edit [<message>]
+# Usage: git edit [-a] [<message>]
 # Without a message, keeps the existing commit message.
+# -a: run git add -A before amending
+
+if [[ "$1" == "-a" ]]; then
+    shift
+    git add -A
+fi
 
 if [[ $# -eq 0 ]]; then
     exec git commit --amend --no-edit
