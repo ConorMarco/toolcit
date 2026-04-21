@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# ding - play an auditory notification sound
+#
+# Usage: long_running_command && ding
+
+set -euo pipefail
+
+sounds=(
+    /usr/share/sounds/freedesktop/stereo/complete.oga
+    /usr/share/sounds/freedesktop/stereo/bell.oga
+    /usr/share/sounds/ocean/stereo/complete.oga
+)
+
+for sound in "${sounds[@]}"; do
+    if [[ -f "$sound" ]]; then
+        if command -v paplay &>/dev/null; then
+            exec paplay "$sound"
+        elif command -v pw-play &>/dev/null; then
+            exec pw-play "$sound"
+        elif command -v aplay &>/dev/null; then
+            exec aplay -q "$sound"
+        fi
+    fi
+done
+
+# Fallback: terminal bell
+printf '\a'

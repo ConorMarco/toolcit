@@ -31,6 +31,11 @@ Search shell history for lines matching all terms. Returns the N most recent mat
 **`hsi [-n N] [-c|-C]`**  
 Interactive history search TUI. Type to filter, arrow keys to navigate, Enter to insert the selected command into your prompt.
 
+### Notifications
+
+**`ding`**  
+Play an auditory notification sound. Falls back to a terminal bell if no sound files are found. Useful chained after long commands: `long_command && ding`.
+
 ### Git
 
 **`git cam <message>`**  
