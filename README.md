@@ -20,6 +20,9 @@ Persistently add a directory to PATH. Stored in `~/.config/addpath/paths` and lo
 **`perm [-f] <line>`**  
 Permanently add a line to your shell rc files. `-f` adds a `source` line for the given file path.
 
+**`touched [-n N] [-a] [-g] [dir...]`**  
+List a directory's contents ordered by when each entry was most recently touched, recursively. Like `ls` but sorted by deepest mtime. `-n N` limits to N entries. `-a` includes hidden files, `-g` includes `.git` directories.
+
 **`yesand <a> [b...]`**  
 Like `yes(1)` but cycles through multiple arguments.
 

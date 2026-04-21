@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# touched - list directory contents ordered by most recently touched (recursively)
+#
+# Usage: touched [options] [dir...]
+#   -n <count>   show only the N most recently touched entries (default: all)
+#   -a           include hidden entries (excluded by default, like ls)
+#   -g           include .git directories
+#
+# Examples:
+#   touched                  # list current dir contents by last touch time
+#   touched ~/projects       # list ~/projects contents by last touch time
+#   touched -n 5 .           # show 5 most recently touched entries
+
+set -euo pipefail
+
+count=0
+dirs=()
+prune_hidden=true
+prune_git=true
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n)
+            [[ $# -ge 2 ]] || { echo "touched: -n requires an argument" >&2; exit 1; }
+            count="$2"
+            shift 2
+            ;;
+        -a) prune_hidden=false; shift ;;
+        -g) prune_git=false; shift ;;
+        -h|--help)
+            sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        -*) echo "touched: unknown option: $1" >&2; exit 1 ;;
+        *)  dirs+=("$1"); shift ;;
+    esac
+done
+
+[[ ${#dirs[@]} -gt 0 ]] || dirs=(.)
+
+for dir in "${dirs[@]}"; do
+    [[ -d "$dir" ]] || { echo "touched: not a directory: $dir" >&2; exit 1; }
+
+    find_args=(-mindepth 1)
+    if $prune_git; then
+        find_args+=(-name .git -prune -o)
+    fi
+    find_args+=(-printf '%T@\t%P\n')
+
+    result="$(
+        find "$dir" "${find_args[@]}" 2>/dev/null \
+        | awk -v hide="$prune_hidden" '
+            BEGIN { FS = "\t" }
+            {
+                mtime = $1
+                path = $2
+                split(path, parts, "/")
+                child = parts[1]
+                if (child == "") next
+                if (hide == "true" && substr(child, 1, 1) == ".") next
+                if (mtime > max[child]) max[child] = mtime
+            }
+            END { for (c in max) printf "%s\t%s\n", max[c], c }
+        ' \
+        | sort -rn \
+        | { [[ "$count" -gt 0 ]] && head -n "$count" || cat; } \
+        | while IFS=$'\t' read -r epoch child; do
+            printf '%s  %s\n' "$(date -d "@${epoch%.*}" '+%Y-%m-%d %H:%M:%S')" "$child"
+          done
+    )" || true
+
+    if [[ ${#dirs[@]} -gt 1 ]]; then
+        echo "$dir:"
+        if [[ -n "$result" ]]; then
+            echo "$result" | sed 's/^/  /'
+        fi
+    else
+        echo "$result"
+    fi
+done
