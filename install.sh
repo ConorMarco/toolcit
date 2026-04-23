@@ -17,12 +17,12 @@ SHELL_INIT="$REPO_DIR/shell-init"
 
 # Offer git-clone wrapper (copies init.templateDir .gitignore into cloned repos)
 echo ""
-echo "toolcit includes a 'git clone' wrapper that copies your init.templateDir .gitignore"
-echo "into cloned repos that don't already have one."
+echo "toolcit includes 'git clone' and 'git init' wrappers that copy your init.templateDir"
+echo ".gitignore into repos that don't already have one. The git init wrapper is always enabled."
 echo "Requires init.templateDir to be configured, e.g.:"
 echo "  git config --global init.templateDir ~/.config/git/template"
 echo "  mkdir -p ~/.config/git/template && cp /path/to/.gitignore ~/.config/git/template/"
-read -r -p "Enable the git clone wrapper? [y/N] " reply
+read -r -p "Enable the git clone wrapper? (git init is already enabled) [y/N] " reply
 if [[ "$reply" =~ ^[Yy]$ ]]; then
     git config --global toolcit.wrapClone true
     echo "install: enabled git clone wrapper. To disable later:"

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# git-init - wrapper around git init that copies the default .gitignore
+# template into the new repo if one is configured and the repo doesn't
+# already have one.
+
+set -euo pipefail
+
+# Remove our bin from PATH to call the real git init without recursing
+_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATH="${PATH//${_bin}:/}" git init "$@"
+
+# Only proceed if a template .gitignore is configured
+template_dir="$(git config --global init.templateDir 2>/dev/null)" || exit 0
+template_ignore="$template_dir/.gitignore"
+[[ -f "$template_ignore" ]] || exit 0
+
+# Find the target directory: last non-option argument, defaulting to .
+repo_dir="."
+for arg in "$@"; do
+    case "$arg" in
+        --bare|--quiet|-q|--no-shared-index) ;;
+        --template=*|--separate-git-dir=*|--shared=*|--object-format=*|--branch=*|-b*) ;;
+        --template|--separate-git-dir|--shared|--object-format|--branch|-b) ;;
+        -*) ;;
+        *) repo_dir="$arg" ;;
+    esac
+done
+
+[[ -d "$repo_dir" ]] || exit 0
+[[ ! -f "$repo_dir/.gitignore" ]] || exit 0
+
+cp "$template_ignore" "$repo_dir/.gitignore"

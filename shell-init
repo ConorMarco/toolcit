@@ -7,6 +7,15 @@
 # Load addpath (PATH management + function)
 source "$(dirname "${BASH_SOURCE[0]:-${(%):-%x}}")/bin/addpath"
 
+# git wrapper: route init/clone through toolcit wrappers when present
+git() {
+    case "$1" in
+        init)  command git-init  "${@:2}" ;;
+        clone) command git-clone "${@:2}" ;;
+        *)     command git "$@" ;;
+    esac
+}
+
 # hsi: wraps the hsi binary to insert the selected command into the readline
 # buffer rather than printing it to stdout.
 if command -v hsi &>/dev/null 2>&1; then

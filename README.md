@@ -61,3 +61,6 @@ Cherry-pick the last n commits (default 1) onto main.
 
 **`git clone`**  
 Wrapper that copies a `.gitignore` from `init.templateDir` into cloned repos that don't already have one. Enable with `git config --global toolcit.wrapClone true`.
+
+**`git init`**  
+Wrapper that copies a `.gitignore` from `init.templateDir` into newly initialised repos that don't already have one. Always enabled; requires `init.templateDir` to be set.
