@@ -18,6 +18,28 @@ git() {
 
 # hsi: wraps the hsi binary to insert the selected command into the readline
 # buffer rather than printing it to stdout.
+# venv helpers
+va() {
+    local venv="${1:-.venv}"
+    if [[ ! -f "$venv/bin/activate" ]]; then
+        echo "No venv found at $venv" >&2
+        return 1
+    fi
+    source "$venv/bin/activate"
+}
+
+vd() {
+    deactivate
+}
+
+vup() {
+    local venv="${1:-.venv}"
+    if [[ ! -d "$venv" ]]; then
+        python3 -m venv "$venv"
+    fi
+    "$venv/bin/pip" install -r requirements.txt
+}
+
 if command -v hsi &>/dev/null 2>&1; then
     _hsi() {
         local cmd

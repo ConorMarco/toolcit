@@ -26,6 +26,17 @@ List a directory's contents ordered by when each entry was most recently touched
 **`yesand <a> [b...]`**  
 Like `yes(1)` but cycles through multiple arguments.
 
+### Python venv
+
+**`va [dir]`**  
+Activate the venv at `dir` (default `.venv`) in the current directory.
+
+**`vd`**  
+Deactivate the current venv.
+
+**`vup [dir]`**  
+Create the venv at `dir` (default `.venv`) if it doesn't exist, then install from `requirements.txt`.
+
 ### History Search
 
 **`hs [-n N] [-i] [-c|-C] <term...>`**  
